@@ -69,6 +69,13 @@ const UserSchema = new mongoose.Schema({
       return this.role === 'student'; 
     }
   },
+  designation: {  // <-- ADD THIS FIELD FOR FACULTY
+    type: String,
+    required: function() { 
+      return this.role === 'professor'; 
+    },
+    default: 'Professor'
+  },
   staffId: {
     type: String,
     required: function() { 

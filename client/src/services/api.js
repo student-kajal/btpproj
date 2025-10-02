@@ -230,6 +230,11 @@ class ApiService {
     });
     return response.data;
   }
+ // ✅ ANALYTICS METHOD - MOVED INSIDE CLASS
+  async getAnalytics(params = {}) {
+    const response = await this.api.get('/admin/analytics', { params });
+    return response.data;
+  }
 
   // Student methods
   async getStudentDashboard() {
@@ -267,6 +272,59 @@ class ApiService {
     });
     return response.data;
   }
+async getProfessorDashboard() {
+    const response = await this.api.get('/professor/dashboard');
+    return response.data;
+  }
+
+  // Group Management
+  async getPendingGroups(params = {}) {
+    const response = await this.api.get('/professor/groups/pending', { params });
+    return response.data;
+  }
+
+  async getAllGroups(params = {}) {
+    const response = await this.api.get('/professor/groups', { params });
+    return response.data;
+  }
+
+  async approveGroup(groupId, projectData) {
+    const response = await this.api.put(`/professor/groups/${groupId}/approve`, projectData);
+    return response.data;
+  }
+
+  async rejectGroup(groupId, reason) {
+    const response = await this.api.put(`/professor/groups/${groupId}/reject`, { reason });
+    return response.data;
+  }
+
+  async editProject(groupId, projectData) {
+    const response = await this.api.put(`/professor/groups/${groupId}/project`, projectData);
+    return response.data;
+  }
+
+  // Publication Management
+  async addPublication(publicationData) {
+    const response = await this.api.post('/professor/publications', publicationData);
+    return response.data;
+  }
+
+  async getPublications(params = {}) {
+    const response = await this.api.get('/professor/publications', { params });
+    return response.data;
+  }
+
+  async updatePublication(publicationId, publicationData) {
+    const response = await this.api.put(`/professor/publications/${publicationId}`, publicationData);
+    return response.data;
+  }
+
+  async deletePublication(publicationId) {
+    const response = await this.api.delete(`/professor/publications/${publicationId}`);
+    return response.data;
+  }
 }
+
+
 
 export default new ApiService();

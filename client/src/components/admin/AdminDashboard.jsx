@@ -3,6 +3,9 @@ import { useAuth } from '../../hooks/useAuth.jsx';
 import api from '../../services/api.js';
 import Modal from '../common/Modal.jsx';
 import FileUpload from '../common/FileUpload.jsx';
+import Analytics from './Analytics.jsx';
+import SessionManager from './SessionManager.jsx';
+
 
 const AdminDashboard = () => {
   const [stats, setStats] = useState(null);
@@ -10,6 +13,9 @@ const AdminDashboard = () => {
   const [activeModal, setActiveModal] = useState(null);
   const [uploadProgress, setUploadProgress] = useState(false);
   const [uploadResults, setUploadResults] = useState(null);
+   const [showAnalytics, setShowAnalytics] = useState(false);
+   const [showSessionManager, setShowSessionManager] = useState(false);
+
   const { user, logout } = useAuth();
 
   // Form states
@@ -23,6 +29,7 @@ const AdminDashboard = () => {
     startDate: '',
     endDate: ''
   });
+  
 
   useEffect(() => {
     loadDashboard();
@@ -135,32 +142,59 @@ const handleUploadStudents = async () => {
     }
   };
 
-  const handleCreateSession = async () => {
-    if (!sessionForm.startDate || !sessionForm.endDate) {
-      alert('Please fill all required fields');
-      return;
-    }
+  // const handleCreateSession = async () => {
+  //   if (!sessionForm.startDate || !sessionForm.endDate) {
+  //     alert('Please fill all required fields');
+  //     return;
+  //   }
 
-    setUploadProgress(true);
+  //   setUploadProgress(true);
 
-    try {
-      await api.post('/admin/sessions', sessionForm);
-      alert('Session created successfully!');
-      setActiveModal(null);
-      setSessionForm({
-        sessionYear: '2024-25',
-        semester: 'odd',
-        minGroupSize: 2,
-        maxGroupSize: 4,
-        startDate: '',
-        endDate: ''
-      });
-    } catch (error) {
-      alert('Failed to create session: ' + (error.response?.data?.message || error.message));
-    } finally {
-      setUploadProgress(false);
-    }
-  };
+  //   try {
+  //     await api.post('/admin/sessions', sessionForm);
+  //     alert('Session created successfully!');
+  //     setActiveModal(null);
+  //     setSessionForm({
+  //       sessionYear: '2024-25',
+  //       semester: 'odd',
+  //       minGroupSize: 2,
+  //       maxGroupSize: 4,
+  //       startDate: '',
+  //       endDate: ''
+  //     });
+  //   } catch (error) {
+  //     alert('Failed to create session: ' + (error.response?.data?.message || error.message));
+  //   } finally {
+  //     setUploadProgress(false);
+  //   }
+  // };
+// ✅ CORRECT (Updated code)
+const handleCreateSession = async () => {
+  if (!sessionForm.startDate || !sessionForm.endDate) {
+    alert('Please fill all required fields');
+    return;
+  }
+
+  setUploadProgress(true);
+
+  try {
+    await api.api.post('/admin/sessions', sessionForm);  // ✅ CORRECT
+    alert('Session created successfully!');
+    setActiveModal(null);
+    setSessionForm({
+      sessionYear: '2024-25',
+      semester: 'odd',
+      minGroupSize: 2,
+      maxGroupSize: 4,
+      startDate: '',
+      endDate: ''
+    });
+  } catch (error) {
+    alert('Failed to create session: ' + (error.response?.data?.message || error.message));
+  } finally {
+    setUploadProgress(false);
+  }
+};
 
   const closeModal = () => {
     setActiveModal(null);
@@ -255,12 +289,18 @@ const handleUploadStudents = async () => {
             >
               📅 Create Session
             </button>
-            <button 
+             <button 
               className="btn btn-primary"
-              onClick={() => alert('Analytics feature coming soon!')}
+              onClick={() => setShowAnalytics(true)} // ✅ FIXED: Correct onClick
             >
               📊 View Analytics
             </button>
+            <button 
+  className="btn btn-primary"
+  onClick={() => setShowSessionManager(true)}
+>
+  📅 Manage Sessions
+</button>
           </div>
         </div>
       </div>
@@ -573,6 +613,12 @@ const handleUploadStudents = async () => {
           </button>
         </div>
       </Modal>
+      {showAnalytics && (
+        <Analytics onClose={() => setShowAnalytics(false)} />
+      )}
+      {showSessionManager && (
+  <SessionManager onClose={() => setShowSessionManager(false)} />
+)}
     </div>
   );
 };

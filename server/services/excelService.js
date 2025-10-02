@@ -543,11 +543,186 @@ export class ExcelService {
   }
 
   static async processFacultyExcel(fileBuffer, session, semester) {
-    // Similar optimized implementation for faculty
-    return {
-      success: 0,
-      errors: ['Faculty upload not implemented yet'],
-      duplicates: 0
-    };
+    try {
+      console.log('📊 Starting Faculty Excel processing...');
+      
+      const workbook = XLSX.read(fileBuffer, { type: 'buffer' });
+      const sheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[sheetName];
+      
+      // Convert to JSON with proper options
+      const jsonData = XLSX.utils.sheet_to_json(worksheet, { 
+        header: 1,
+        defval: '',
+        raw: false 
+      });
+
+      const results = {
+        success: 0,
+        errors: [],
+        duplicates: 0
+      };
+
+      if (!jsonData || jsonData.length < 2) {
+        results.errors.push('Faculty Excel file is empty or has insufficient data');
+        return results;
+      }
+
+      // Find header row
+      let dataStartIndex = -1;
+      let headers = [];
+
+      for (let i = 0; i < Math.min(jsonData.length, 10); i++) {
+        const row = jsonData[i];
+        if (row && Array.isArray(row)) {
+          const headerIndex = row.findIndex(cell => 
+            cell && typeof cell === 'string' && 
+            (cell.includes('SL NO') || cell.includes('Staff ID') || cell.includes('Employee ID') || 
+             cell.includes('Name') || cell.includes('Faculty') || cell.includes('Professor'))
+          );
+          
+          if (headerIndex !== -1) {
+            dataStartIndex = i;
+            headers = row;
+            break;
+          }
+        }
+      }
+
+      if (dataStartIndex === -1) {
+        results.errors.push('Could not find header row with faculty column names');
+        return results;
+      }
+
+      console.log('📋 Faculty Headers found at row', dataStartIndex + 1, ':', headers);
+
+      // Find column indices for faculty data
+      const slNoIndex = headers.findIndex(h => h && h.toString().includes('SL NO'));
+      const staffIdIndex = headers.findIndex(h => h && (h.toString().includes('Staff ID') || h.toString().includes('Employee ID') || h.toString().includes('Faculty ID')));
+      const nameIndex = headers.findIndex(h => h && h.toString().includes('Name'));
+      const emailIndex = headers.findIndex(h => h && (h.toString().includes('Email') || h.toString().includes('E-mail')));
+      const mobileIndex = headers.findIndex(h => h && h.toString().includes('Mobile'));
+      const deptIndex = headers.findIndex(h => h && (h.toString().includes('Dept') || h.toString().includes('Department')));
+      const designationIndex = headers.findIndex(h => h && (h.toString().includes('Designation') || h.toString().includes('Position')));
+
+      // Collect all valid faculty data first
+      const facultyToCreate = [];
+      const existingEmails = new Set();
+      const existingStaffIds = new Set();
+
+      console.log('📊 Preparing faculty data...');
+
+      // Get existing users in bulk
+      const existingUsers = await User.find({}, { staffId: 1, email: 1 });
+      existingUsers.forEach(user => {
+        if (user.staffId) existingStaffIds.add(user.staffId);
+        if (user.email) existingEmails.add(user.email.toLowerCase());
+      });
+
+      // Process rows and collect data
+      for (let i = dataStartIndex + 1; i < jsonData.length; i++) {
+        const row = jsonData[i];
+        
+        if (!row || !Array.isArray(row) || row.length === 0) continue;
+
+        try {
+          // Extract data using column indices
+          const slNo = row[slNoIndex];
+          const staffId = row[staffIdIndex] || row[slNoIndex]; // Use SL NO as fallback for Staff ID
+          const name = row[nameIndex];
+          let email = row[emailIndex];
+          const mobile = row[mobileIndex];
+          const dept = row[deptIndex];
+          const designation = row[designationIndex];
+
+          // Skip if essential data missing
+          if (!staffId || !name || staffId === 'SL NO' || staffId === 'Staff ID') {
+            console.log(`Skipping faculty row ${i + 1}: Missing essential data`);
+            continue;
+          }
+
+          // Generate email if missing
+          if (!email || email === '' || email.toString().trim() === '') {
+            const cleanStaffId = staffId.toString().toLowerCase().replace(/[^a-z0-9]/g, '');
+            const cleanName = name.toString().toLowerCase().replace(/[^a-z]/g, '').substring(0, 5);
+            email = `${cleanName}${cleanStaffId}@nsut.ac.in`;
+            console.log(`Generated email for ${name}: ${email}`);
+          }
+
+          // Clean data
+          const cleanEmail = email.toString().toLowerCase().trim();
+          const cleanMobile = mobile ? mobile.toString().replace(/[^\d]/g, '') : '9999999999';
+          const finalMobile = cleanMobile.length >= 10 ? cleanMobile.substring(0, 10) : '9999999999';
+
+          // Check for duplicates
+          if (existingStaffIds.has(staffId.toString()) || existingEmails.has(cleanEmail)) {
+            results.duplicates++;
+            console.log(`Duplicate faculty found: ${staffId}`);
+            continue;
+          }
+
+          // Create faculty user object
+          const facultyUser = {
+            userId: staffId.toString(),
+            staffId: staffId.toString(),
+            name: name.toString().trim(),
+            email: cleanEmail,
+            mobile: finalMobile,
+            role: 'professor',
+            department: dept ? dept.toString().trim() : 'ELECTRONICS AND COMMUNICATION ENGINEERING',
+            designation: designation ? designation.toString().trim() : 'Professor',
+            session,
+            semester,
+            password: 'prof123',
+            isActive: true
+          };
+
+          facultyToCreate.push(facultyUser);
+
+          // Avoid duplicates within the same upload
+          existingStaffIds.add(staffId.toString());
+          existingEmails.add(cleanEmail);
+
+        } catch (error) {
+          console.error(`❌ Error in faculty row ${i + 1}:`, error);
+          results.errors.push(`Row ${i + 1}: ${error.message}`);
+        }
+      }
+
+      console.log(`📊 Prepared ${facultyToCreate.length} faculty for creation`);
+
+      // Batch create faculty (in chunks of 20)
+      const batchSize = 20;
+      for (let i = 0; i < facultyToCreate.length; i += batchSize) {
+        const batch = facultyToCreate.slice(i, i + batchSize);
+        
+        try {
+          await User.insertMany(batch, { ordered: false });
+          results.success += batch.length;
+          console.log(`✅ Created faculty batch ${Math.floor(i/batchSize) + 1}: ${batch.length} professors`);
+        } catch (error) {
+          // Handle individual errors in batch
+          for (const faculty of batch) {
+            try {
+              await User.create(faculty);
+              results.success++;
+            } catch (individualError) {
+              results.errors.push(`${faculty.name}: ${individualError.message}`);
+            }
+          }
+        }
+      }
+
+      console.log('📊 Faculty Final Results:', results);
+      return results;
+
+    } catch (error) {
+      console.error('❌ Faculty Excel processing error:', error);
+      return {
+        success: 0,
+        errors: [`Faculty Excel processing failed: ${error.message}`],
+        duplicates: 0
+      };
+    }
   }
-}
+} // <-- CLOSING BRACKET ADDED

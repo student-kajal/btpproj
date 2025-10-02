@@ -4,8 +4,7 @@ const GroupSchema = new mongoose.Schema({
   groupName: {
     type: String,
     required: true,
-    trim: true,
-    index: true
+    trim: true
   },
   members: [{
     type: mongoose.Schema.Types.ObjectId,
@@ -15,44 +14,42 @@ const GroupSchema = new mongoose.Schema({
   professor: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: true,
-    index: true
+    required: true
+  },
+  projectTitle: {
+    type: String,
+    default: ''
+  },
+  projectDescription: {
+    type: String,
+    default: ''
+  },
+  status: {
+    type: String,
+    enum: ['pending', 'approved', 'rejected'],
+    default: 'pending'
   },
   session: {
     type: String,
-    required: true,
-    index: true
+    required: true
   },
   semester: {
     type: String,
     enum: ['odd', 'even'],
-    required: true,
-    index: true
-  },
-  status: {
-    type: String,
-    enum: ['proposed', 'approved', 'rejected', 'active'],
-    default: 'proposed',
-    index: true
-  },
-  proposedBy: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
     required: true
   },
-  approvedAt: Date,
-  project: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Project'
+  rejectionReason: String,
+  proposedAt: {
+    type: Date,
+    default: Date.now
   },
-  rejectionReason: String
+  approvedAt: Date,
+  rejectedAt: Date
 }, {
   timestamps: true
 });
 
-// Indexes
-GroupSchema.index({ session: 1, semester: 1, status: 1 });
-GroupSchema.index({ professor: 1, status: 1 });
+// Prevent duplicate group names in same session/semester
 GroupSchema.index({ groupName: 1, session: 1, semester: 1 }, { unique: true });
 
 export default mongoose.model('Group', GroupSchema);

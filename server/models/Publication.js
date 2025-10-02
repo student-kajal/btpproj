@@ -1,23 +1,33 @@
 import mongoose from 'mongoose';
 
 const PublicationSchema = new mongoose.Schema({
-  title: {
+  doi: {
     type: String,
     required: true,
-    trim: true
+    unique: true
+  },
+  title: {
+    type: String,
+    required: true
   },
   authors: [{
     type: String,
-    required: true,
-    trim: true
+    required: true
   }],
-  journal: String,
-  conference: String,
-  doi: String,
-  publishedDate: {
-    type: Date,
+  journal: {
+    type: String,
     required: true
   },
+  year: {
+    type: Number,
+    required: true,
+    min: 1900,
+    max: new Date().getFullYear() + 1
+  },
+  volume: String,
+  issue: String,
+  pages: String,
+  publishedDate: Date,
   group: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Group'
@@ -25,43 +35,23 @@ const PublicationSchema = new mongoose.Schema({
   professor: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: true,
-    index: true
+    required: true
   },
   session: {
     type: String,
-    required: true,
-    index: true
+    required: true
   },
   semester: {
     type: String,
     enum: ['odd', 'even'],
-    required: true,
-    index: true
+    required: true
   },
-  type: {
-    type: String,
-    enum: ['journal', 'conference', 'book_chapter', 'patent', 'other'],
-    required: true,
-    index: true
-  },
-  status: {
-    type: String,
-    enum: ['published', 'accepted', 'under_review', 'submitted'],
-    required: true,
-    index: true
-  },
-  url: String,
-  citations: {
-    type: Number,
-    default: 0
+  isActive: {
+    type: Boolean,
+    default: true
   }
 }, {
   timestamps: true
 });
-
-// Indexes
-PublicationSchema.index({ session: 1, semester: 1, type: 1 });
-PublicationSchema.index({ professor: 1, status: 1 });
 
 export default mongoose.model('Publication', PublicationSchema);

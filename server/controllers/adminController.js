@@ -216,3 +216,95 @@ export const getAllUsers = async (req, res) => {
     });
   }
 };
+export const getAnalytics = async (req, res) => {
+  try {
+    const { session = '2024-25', semester = 'odd', page = 1, limit = 50, sortBy = 'userId' } = req.query;
+
+    // Get all users data for stats
+    const allUsers = await User.find({ session, semester }).select('-password');
+    const students = allUsers.filter(u => u.role === 'student');
+    const professors = allUsers.filter(u => u.role === 'professor');
+
+    // Department-wise distribution
+    const departmentStats = {};
+    allUsers.forEach(user => {
+      if (user.department) {
+        departmentStats[user.department] = departmentStats[user.department] || { students: 0, professors: 0 };
+        departmentStats[user.department][user.role === 'student' ? 'students' : 'professors']++;
+      }
+    });
+
+    // Category-wise distribution (for students)
+    const categoryStats = {};
+    students.forEach(student => {
+      if (student.category) {
+        categoryStats[student.category] = (categoryStats[student.category] || 0) + 1;
+      }
+    });
+
+    // Recent uploads (last 30 days)
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const recentStudents = await User.find({
+      role: 'student',
+      createdAt: { $gte: thirtyDaysAgo }
+    }).sort({ createdAt: -1 }).limit(10);
+
+    const recentProfessors = await User.find({
+      role: 'professor',
+      createdAt: { $gte: thirtyDaysAgo }
+    }).sort({ createdAt: -1 }).limit(10);
+
+    // ✅ PROPER SORTING - Roll Number Ascending Order
+    const skip = (page - 1) * limit;
+    let sortQuery = {};
+    
+    if (sortBy === 'userId') {
+      // Sort by userId (roll number) in ascending order
+      sortQuery = { userId: 1 };
+    } else if (sortBy === 'name') {
+      sortQuery = { name: 1 };
+    } else {
+      sortQuery = { createdAt: -1 }; // Default: newest first
+    }
+
+    const paginatedUsers = await User.find({ session, semester })
+      .select('-password')
+      .sort(sortQuery) // ✅ PROPER SORTING
+      .skip(skip)
+      .limit(parseInt(limit));
+
+    const totalUsers = allUsers.length;
+    const totalPages = Math.ceil(totalUsers / limit);
+
+    res.json({
+      success: true,
+      data: {
+        overview: {
+          totalUsers: allUsers.length,
+          totalStudents: students.length,
+          totalProfessors: professors.length,
+          session,
+          semester
+        },
+        departmentStats,
+        categoryStats,
+        recentUploads: {
+          students: recentStudents,
+          professors: recentProfessors
+        },
+        users: paginatedUsers, // ✅ Now properly sorted
+        pagination: {
+          currentPage: parseInt(page),
+          totalPages,
+          totalUsers,
+          limit: parseInt(limit),
+          hasNext: page < totalPages,
+          hasPrev: page > 1
+        },
+        sortBy // Return current sort option
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};

@@ -1,13 +1,15 @@
 import express from 'express';
-import { 
+import {
   getDashboard,
   getPendingGroups,
+  getAllGroups,
   approveGroup,
   rejectGroup,
-  getMyGroups,
-  createProject,
-  updateProject,
-  addPublication
+  editProject,
+  addPublication,
+  getPublications,
+  updatePublication,
+  deletePublication
 } from '../controllers/professorController.js';
 import { authenticate, authorize } from '../middleware/auth.js';
 
@@ -17,13 +19,20 @@ const router = express.Router();
 router.use(authenticate);
 router.use(authorize('professor'));
 
+// Dashboard
 router.get('/dashboard', getDashboard);
+
+// Group Management
 router.get('/groups/pending', getPendingGroups);
-router.get('/groups/my', getMyGroups);
+router.get('/groups', getAllGroups);
 router.put('/groups/:groupId/approve', approveGroup);
 router.put('/groups/:groupId/reject', rejectGroup);
-router.post('/projects', createProject);
-router.put('/projects/:projectId', updateProject);
+router.put('/groups/:groupId/project', editProject);
+
+// Publication Management
 router.post('/publications', addPublication);
+router.get('/publications', getPublications);
+router.put('/publications/:publicationId', updatePublication);
+router.delete('/publications/:publicationId', deletePublication);
 
 export default router;
